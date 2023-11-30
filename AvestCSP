@@ -1,0 +1,1332 @@
+%REM
+	Library AvestCSP
+	Created Feb 15, 2017 by Dmitry V Drozdov/LWO/BY
+	Description: Comments for Library
+%END REM
+Option Public
+Option Declare
+
+Use "(lwo.wf.sys.setup)"
+Use "(lwo.wf.const)"
+Use "(lwo.wf.file)"
+
+'Const libpath = "AvCryptMail"
+Const libpath = "C:\Program Files (x86)\Avest\AvPCM_nces\AvCryptMail.dll"
+Public DtAvCmSessionOpen As NotesDateTime 
+Dim AvCmHc 			As Long
+Dim AvCmResult 		As Long
+
+Type AvCmConnectionParam
+	param_id 	As Long
+	param		As String
+End Type
+
+Type AvCmEnumGetParam
+	param_id    As Long
+	param_spec	As Long
+	param		As String	
+End Type
+
+Declare Function AvCmInit 				Lib libpath ( ByVal Flags As Long ) As Long
+Declare Function AvCmLogin  			Lib libpath ( ByVal conn_param_count As Long, conn_params As Any, hc As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmLogout 			Lib libpath ( ByVal hc As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmGetErrorInfo 		Lib libpath ( ByVal hc As Long, ByVal error_code As Long, ByVal param_id As Long,ByVal output_buffer As String, output_size As Long, ByVal flags As Long) As Long
+Declare Function AvCmOpenMsg			Lib libpath ( ByVal hc As Long, ByVal message_data As String, ByVal message_size As Long, hmsg As Long, ByVal flags As Long ) As Long
+Declare Function AvCmMsgSign   			Lib libpath ( ByVal hmsg As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmCloseHandle		Lib libpath ( ByVal hmsg As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmGetMsgParam		Lib libpath ( ByVal hmsg As Long, ByVal attr_id As Long, output_buffer As String, output_size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmSignFile			Lib libpath ( ByVal hc As Long, inFileName As String, outFileName As String, ByVal flags As Long ) As Long
+Declare Function AvCmOpenCertEnum		Lib	libpath ( ByVal hc As Long, ByVal param_count As Long, params As Any ,byval hcert_enum As Any, ByVal flags As Long ) As Long
+Declare Function AvCmEnumGet			Lib libpath ( ByVal henum As Long, handle As Long, ByVal flags As Long ) As Long
+Declare Function AvCmShowObjectInfo 	Lib libpath ( ByVal handle, ByVal hwnd As Long, ByVal cpszDlgCaption As String, ByVal cpszLabel As String, ByVal cpszOkButtonCaption As String, ByVal flags As Long ) As Long
+Declare Function AvCmSign   			Lib libpath ( ByVal hc As Long, ByVal input_message As String, ByVal input_size As Long, output_buffer As Long, output_size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmSign2  			Lib libpath Alias "AvCmSign" ( ByVal hc As Long, ByVal input_message As String, ByVal input_size As Long, ByVal output_buffer As String, output_size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmGetMsg				Lib libpath ( ByVal hmsg As Long, ByVal output_buffer As Long, output_size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmGetMsgTest			Lib libpath Alias "AvCmGetMsg" ( ByVal hmsg As Long, ByVal output_buffer As String, output_size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmGetObjectInfo  	Lib libpath ( ByVal hc As Long, ByVal id As Long, buffer As Long, size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmFindCertBySign 	Lib libpath ( ByVal hsign As Long, hcert As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmGetCertAttr    	Lib libpath ( ByVal hc As Long, ByVal id As Long, ByVal attr_param As String , buffer As String, size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmMsgAddCert     	Lib libpath ( ByVal hc As Long,ByVal cert_count As Long,ByVal AvCmHandle As Any, ByVal flags As Long ) As Long
+Declare Function AvCmMsgSetAttribute 	Lib libpath ( ByVal hc As Long, ByVal id As Long, ByVal attr_param As Long, ByVal buffer As String , size As Long, ByVal Flags As Long ) As Long
+Declare Function AvCmEnumDlg			Lib libpath ( ByVal hc As Long,ByVal cpszDlgCaption As String, ByVal cpszLabel As String, ByVal cpszOkButtonCaption As String, ByVal Flags As Long ) As Long
+Declare Function AvCmSetMsgContent		Lib libpath ( ByVal hc As Long, ByVal input_message As String, ByVal size As Long, ByVal Flags As Long ) As Long
+
+Declare Function AvCmVerifySign 		Lib libpath ( ByVal hc As Long, ByVal input_message As String, ByVal input_size As Long, eeeeee As variant, ByVal output_buffer As String, output_size As Long, ByVal Flags As Long ) As Long 
+
+Declare Function AvCmGetMsgSign			Lib libpath ( ByVal hc As Long, ByVal size_t As Long, hsign As Long, ByVal flags As Long ) As Long
+Declare Function AvCmMsgVerifySignAtIndex Lib libpath ( ByVal hc As Long, ByVal sign_index As Long, ByVal flags As Long ) As Long
+Declare Function AvCmMsgVerifySign		Lib libpath ( ByVal hc As Long,	ByVal hcert As Long,ByVal flags As Long ) As Long
+
+Declare Function AvCmGetCertAttr1  	Lib libpath Alias "AvCmGetCertAttr" ( ByVal hc As Long, ByVal id As Long, attr_param As Long , buffer As String, size As Long, ByVal Flags As Long ) As Long
+
+Declare Function AvCmDuplicateHandle Lib libpath ( ByVal handle As Long, ByVal id As Long, handleCopy As Long, ByVal Flags As Long ) As Long
+
+
+
+
+
+
+
+
+Class Validator
+
+	Private sess 		As NotesSession
+	Private curDoc 		As NotesDocument
+	Private stream 		As NotesStream
+	Private tempDir		As String
+	Private errCode 	As Long
+	Private errMessage 	As String
+	
+'	Private AvCmHc 			As Long ' -- хэндл сессии авеста
+	Private hmsg 			As Long ' -- хэндл сообщения 
+	Private AvCmResult		As Long ' -- ошибки выполнения функции
+	
+
+	
+	
+	Sub New ( doc As NotesDocument )
+		Set me.curDoc = doc
+		Set me.sess   = doc.Parentdatabase.Parent
+		setTempDirectory
+	End Sub
+	
+	Sub Delete
+		Print "Validator close handles" 
+		Delete me.curDoc
+		Delete sess
+		
+'		closeSession 'закрытие сессии Авеста, добавим в закрытие базы
+	End Sub
+	
+	Public Sub closeSession()
+		If hmsg 	<> AVCMF_NULL 	Then Print GetErrorInfo ( AvCmCloseHandle( hmsg, 0&))   '-- закрываем открытое сообщение
+		If AvCmHc 	<> AVCMF_NULL 	Then
+'			Print "AvCmLogout ::: " 		& GetErrorInfo ( AvCmLogout( AvCmHc, 0) ) 	'-- Logout from library
+		End If
+'		Print "AvCmInit(SHUTDOWN)   ::: " 	& GetErrorInfo ( AvCmInit(AVCMF_SHUTDOWN) )	'-- Shutdown library session
+	End sub
+	
+	Public Function validateSignature As boolean
+		On Error GoTo errLabel
+		validateSignature = false
+		' -- Инициализация библиотеки
+		AvCmResult = AvCmInit( AVCMF_STARTUP )
+		If AVCMF_SUCCESS <> AvCmResult Then
+			If AVCMR_ALREADY_INITIALIZED <> AvCmResult Then
+				Call addMessage(20100, "Ошибка инициализации библиотеки")		
+			End If
+		End If
+		
+		' -- Аутентификация пользователя 
+		AvCmResult = AvCmLogin( 0, 0, AvCmHc,  AVCMF_FORCE_TOKEN_CONTROL)
+		'AvCmResult = AvCmLogin( 0, 0, AvCmHc, AVCM_PASSWORD  ) 
+		If AVCMR_USER_CANCEL = AvCmResult Then
+			Call addMessage(20101, GetErrorInfo(AvCmResult))
+			Exit Function	
+		End If
+		If AVCMF_SUCCESS <> AvCmResult Then Call addMessage(20101, GetErrorInfo(AvCmResult))
+		
+		
+		If Not validateAttachments Then Call addMessage(20102, "Нет файлов для проверки подписей")
+		
+		
+		Exit Function	
+errLabel:
+		MsgBox Error & " in line " & Erl
+		Exit Function	
+	End Function
+	
+	Private Sub setTempDirectory
+		tempDir	=	Environ("Temp")
+		If Len(tempDir) = 0 Then tempDir = Environ("Tmp")		
+	End Sub
+	
+	
+	Private Function validateAttachments As Boolean
+		On Error GoTo errLabel
+		Dim stream 	As NotesStream
+		Dim mime 	As NotesMIMEEntity
+		Dim header 	As NotesMIMEHeader
+		Dim result  As Boolean
+		Dim rt 		As NotesRichTextItem
+		Dim count 	As Integer 
+		
+		sess.ConvertMime = False 
+		count 			 = 0
+		Set mime = curDoc.GetMIMEEntity( "File_Attachment" )
+		If Not curDoc.Hasitem("File_Attachment") Then Error 20104, "Нет поля File_Attachment."
+		
+		If mime Is Nothing Then 
+			' -- Файл прикреплен как обычный аттач
+			Set rt = curDoc.GetFirstItem("File_Attachment")
+			ForAll att In rt.EmbeddedObjects
+				If att.Type = EMBED_ATTACHMENT Then
+					Call att.ExtractFile( me.tempDir & "\" & att.Source )
+					Set stream = sess.Createstream()
+						stream.Open me.tempDir & "\" & att.Source
+							Call getSign( stream, att.Source )
+						stream.Truncate
+						stream.Close
+					count = count + 1 
+				End If
+			End ForAll
+		Else
+			'-- Файл прикреплен как mime
+			While Not mime Is Nothing 
+				Set header = mime.GetNthHeader("Content-Disposition")
+				
+				If (Not header Is Nothing) Then
+					If (header.GetHeaderVal(True) = "attachment") Then 
+						Print "Attacment : " & decodeName( header.GetParamVal("filename") )
+						Set stream = sess.Createstream() 
+							stream.Open tempDir & "\" & decodeName( header.GetParamVal("filename") )
+								mime.GetContentAsBytes stream, False 
+								Call getSign( stream, decodeName( header.GetParamVal("filename") ))
+							stream.Truncate
+							stream.Close
+						count = count + 1
+					End If
+				End If	
+				Set mime = mime.GetNextEntity(SEARCH_DEPTH)
+			Wend 
+		End if
+
+		If count = 0 Then
+			validateAttachments = False
+		else	
+			validateAttachments = True
+		End if	
+
+		
+endf:		
+		sess.ConvertMime 	= True
+		Exit Function	
+errLabel:
+		Call addMessage(20103, Error + " in line " & erl)
+		sess.ConvertMime 	= True
+		validateAttachments = False 	
+		Exit Function		
+	End Function
+	
+	Private Function getSign( file_stream As NotesStream, fileName As String) As Boolean
+		Dim stream 	As NotesStream
+		Dim mime 	As NotesMIMEEntity
+		Dim header 	As NotesMIMEHeader
+		Dim count	As Integer 
+		Dim sName	As String
+		
+		sess.ConvertMime = False
+		count 			 = 0
+		getSign			 = true
+		Set mime = curDoc.GetMIMEEntity( "Signature" )	
+		If Not curDoc.Hasitem("Signature") Then Error 20104, "Нет поля Signature."
+		
+		If mime Is Nothing Then 
+			' -- Подпись прикреплена как обычный аттач
+			Dim rt 		As NotesRichTextItem
+			Set rt = curDoc.GetFirstItem("Signature") 
+			ForAll att In rt.EmbeddedObjects
+				If att.Type = EMBED_ATTACHMENT Then
+					Print "Signature : " & att.Source
+					If fileName + ".p7s" = att.Source  Then 
+						Call att.ExtractFile( me.tempDir & "\" & att.Source )
+						Set stream = sess.Createstream()
+							stream.Open me.tempDir & "\" & att.Source
+								getSign = checkSign( file_stream, stream, fileName )
+							stream.Truncate
+							stream.Close
+							count = count + 1
+					End If
+				End If
+			End ForAll
+		Else
+			' -- Подпись прикреплена как mime
+			While Not mime Is Nothing 
+				Set header = mime.GetNthHeader("Content-Disposition")
+				
+				If (Not header Is Nothing) Then
+					If (header.GetHeaderVal(True) = "attachment") Then
+						sName = decodeName( header.GetParamVal("filename") )
+						Print sName + " ::: " + getSingFileName(sName)
+						If fileName = getSingFileName(sName) Then 
+							Set stream = sess.Createstream()
+								stream.Open tempDir & "\" & fileName & ".p7s"
+									mime.GetContentAsbytes stream, False
+									getSign = checkSign( file_stream, stream, fileName ) 
+								stream.Truncate
+								stream.Close
+							count = count + 1	
+						End If
+					End If
+				End If	
+				Set mime = mime.GetNextEntity(SEARCH_DEPTH)
+			Wend  	
+		End If
+		
+		sess.ConvertMime = True
+		If count = 0 Then
+			getSign = False
+			Call addMessage( 20105, fileName + " ::: Отсутствуют файлы подписи." )	 
+		End If
+		 
+	End Function
+	
+	Private Function getSingFileName( sName As String ) As String
+		Dim result As String
+			result = StrLeftBack( sName, "_" )
+		getSingFileName = result
+	End Function
+	
+	Private Function checkSign( file_stream As NotesStream, sign_stream As NotesStream, fileName As String ) As Boolean
+		On Error GoTo errLabel
+
+		file_stream.Position = 0
+		sign_stream.Position = 0
+
+		AvCmResult = AvCmOpenMsg( AvCmHc, sign_stream.Readtext, sign_stream.Bytes , hmsg, AVCMF_IN_PKCS7   )
+			If AVCMF_SUCCESS <> AvCmResult Then	GoTo errLabel
+
+		AvCmResult = AvCmSetMsgContent( hmsg, file_stream.readtext, file_stream.Bytes, AVCMF_APPEND )
+			If AVCMF_SUCCESS <> AvCmResult Then	GoTo errLabel
+
+		'AvCmResult = AvCmMsgVerifySignAtIndex( hmsg, 0&, AVCMF_VERIFY_ON_SIGN_DATE )
+		AvCmResult = AvCmMsgVerifySignAtIndex( hmsg, 0&, 0& )
+			If AVCMF_SUCCESS <> AvCmResult Then	GoTo errLabel
+		
+			checkSign = True
+		
+		Call addMessage( 0, fileName + ": [" + getAVCertSubjectInfo( hmsg ) + "] ::: ОК" ) 
+		
+		Exit Function
+errLabel:
+		checkSign 		= True
+		me.errCode 		= AvCmResult
+		me.errMessage 	= me.errMessage + ";" + fileName + ": [" & getAVCertSubjectInfo( hmsg ) & "] ::: " + GetErrorInfo ( AvCmResult )
+		Exit Function				
+	End Function
+	
+	Private Sub addMessage( code As Long, message As String )
+		Dim separator As String
+			separator = ";"
+		If me.errCode > 0 And me.errCode < 0 Then code = me.errCode 
+		me.errCode 		= code
+		If Len( me.errMessage ) = 0 Then separator = "" 
+		me.errMessage 	= me.errMessage + separator	+ message
+	End Sub
+	
+	Private Function getAVCertSubjectInfo( hmsg As Long ) As String
+		On Error GoTo errLabel
+		Dim result(2) 		As String
+		Dim AvCmResult 		As Long, hsign As Long, hcert As Long
+		Dim buff_size 		As Long, buff_size2 As Long,  i As Integer
+		Dim attr_oid 		As String, attr_val As String, attr_count As String
+
+		result(0) = ""
+		result(1) = ""
+
+		AvCmResult = AvCmGetMsgSign( hmsg, 0&, hsign, 0&)
+		If AvCmResult <> 0 Then MsgBox  GetErrorInfo ( AvCmResult )
+		
+		AvCmResult = AvCmFindCertBySign( hsign, hcert, 0& )
+		If AvCmResult <> 0 Then MsgBox  GetErrorInfo ( AvCmResult )
+
+		AvCmResult = AvCmGetCertAttr( hcert, AVCM_SUBJECT_ATTR_COUNT, 0&, attr_count, buff_size, AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+		If AvCmResult <> 0 Then MsgBox  GetErrorInfo ( AvCmResult )
+		
+		For i = 0 To Asc( attr_count ) - 1  
+			attr_oid 	= ""
+			attr_val 	= ""
+			buff_size	= 0
+			buff_size2  = 0
+			AvCmResult = AvCmGetCertAttr1( hcert, AVCM_SUBJECT_ATTR, 	 CLng(i), attr_val, buff_size,  AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+			AvCmResult = AvCmGetCertAttr1( hcert, AVCM_SUBJECT_ATTR_OID, CLng(i), attr_oid, buff_size2, AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+			
+			If AvCmResult = 0 Then
+				attr_val = Left( ConvertPAnsi( attr_val, "Windows-1251"), buff_size - 1)
+				attr_oid = Left( ConvertPAnsi( attr_oid, "Windows-1251"), buff_size2- 1)
+				
+				If attr_oid = "2.5.4.41" Then
+					result(1) =  attr_val
+				ElseIf attr_oid = "2.5.4.4" Then
+					result(0) = attr_val
+				End If 
+			End If	
+		Next
+			getAVCertSubjectInfo = result(0) + " " + result(1)		
+	errLabel:	
+		If AVCMF_NULL <> hcert Then Call AvCmCloseHandle( hcert, 0&)
+		If AVCMF_NULL <> hsign Then Call AvCmCloseHandle( hsign, 0&)
+		Exit Function	
+	End Function
+	
+	
+	
+	Function decodeName ( txtName As String ) As String
+		Dim docTemp 	As NotesDocument
+		Dim body 		As NotesMIMEEntity
+		Dim stream		As NotesStream
+		
+		Set docTemp = sess.CurrentDatabase.CreateDocument
+		Set body    = docTemp.CreateMIMEEntity
+		Set stream  = sess.CreateStream
+			sess.ConvertMIME = False
+			stream.Writetext Replace( Replace( txtName, |=?UTF-8?B?|, "" ),|?=|, "" )
+		Call body.SetContentFromText ( stream, "text/plain;charset=UTF-8", ENC_BASE64)
+			stream.Truncate
+		Call body.GetContentAsText ( stream, True)
+			stream.Position		= 0 
+			decodeName 			= stream.Readtext
+			sess.ConvertMIME 	= True
+	End Function
+	
+	Function ConvertPAnsi( ByVal strInput As String, ByVal chrset As String ) As String 
+		Dim sess 	As New NotesSession
+		Dim stream  As NotesStream
+		Dim db 		As NotesDatabase
+		Dim doc 	As NotesDocument
+		Dim mime 	As NotesMIMEEntity
+		
+		sess.ConvertMIME = False
+		
+		Set db 		= sess.CurrentDatabase
+		Set doc 	= db.CreateDocument
+		Set mime 	= doc.CreateMIMEEntity("Body")
+		Set stream 	= sess.createStream
+			stream.Writetext strInput 
+			stream.Position = 0
+		Call mime.Setcontentfrombytes( stream, "text/plain; charset=" & chrset, ENC_NONE)
+		ConvertPAnsi = mime.ContentAsText
+		sess.ConvertMIME = True
+	End Function
+	
+	
+	Public Property Get getErrorCode As Long
+		getErrorCode = me.errCode	
+	End Property
+	
+	Public Property Get getErrorMessage As String
+		getErrorMessage = me.errMessage		
+	End Property
+	
+End Class
+
+Class AvestManager
+
+	Private sess 		As NotesSession
+	Private curDoc 		As NotesDocument
+	Private stream 		As NotesStream
+	Private tempDir		As String
+	Private errCode 	As Long
+	Private errMessage 	As String
+	
+	Public AvCmHc 			As Long ' -- хэндл сессии авеста
+	Public hmsg 			As Long ' -- хэндл сообщения 
+	Public AvCmResult		As Long ' -- ошибки выполнения функции
+	Public DtAvCmSessionOpen As NotesDateTime 
+	
+	Sub New ( sess As NotesSession, AvCmHc As long )
+'		Set me.curDoc = doc
+		If me.sess Is Nothing Then Set me.sess   = sess
+		me.AvCmHc = AvCmHc
+		If tempDir = "" Then setTempDirectory
+		If DtAvCmSessionOpen Is Nothing Then Set DtAvCmSessionOpen = New NotesDateTime(Now)
+		
+	End Sub
+	
+	Sub Delete
+		Print "Validator close handles" 
+		If Not me.curDoc Is Nothing Then Delete me.curDoc
+		Delete sess
+		
+'		closeSession 'закрытие сессии Авеста, добавим в закрытие базы
+	End Sub
+	
+	Public Sub AMcloseSession()
+		If hmsg 	<> AVCMF_NULL 	Then Print GetErrorInfo ( AvCmCloseHandle( hmsg, 0&))   '-- закрываем открытое сообщение
+'		If AvCmHc 	<> AVCMF_NULL 	Then
+'			Print "AvCmLogout ::: " 		& GetErrorInfo ( AvCmLogout( AvCmHc, 0) ) 	'-- Logout from library
+'		End If
+'		Print "AvCmInit(SHUTDOWN)   ::: " 	& GetErrorInfo ( AvCmInit(AVCMF_SHUTDOWN) )	'-- Shutdown library session
+	End Sub
+	
+	Public Sub AMopenSession()
+		
+		Dim profDoc As NotesDocument
+		Dim dtNow As New NotesDateTime(Now)
+		
+		Set profDoc = sess.Currentdatabase.Getprofiledocument("(Profile)", sess.Commonusername)
+		If profDoc.Hasitem("DtAvCmSessionOpen") Then 
+			Set DtAvCmSessionOpen = New NotesDateTime(profDoc.DtAvCmSessionOpen(0))
+		End If
+		If profDoc.Hasitem("AvCmHc") Then 
+			me.AvCmHc = CLng(profDoc.AvCmHc(0))
+		End If
+		
+		If DtAvCmSessionOpen Is Nothing Then Set DtAvCmSessionOpen = New NotesDateTime (Now)
+		If dtNow.Timedifference(DtAvCmSessionOpen) > 4*60*60 Then
+			Call me.AMcloseSession()
+			me.AvCmHc = 0
+			'Set DtAvCmSessionOpen = New NotesDateTime (Now) 
+			Set me.DtAvCmSessionOpen = New NotesDateTime (Now)
+		End If
+		
+		If AvCmHc = 0  Then
+			'===========Авторизация пользователя====================
+			AvCmResult = AvCmInit( AVCMF_STARTUP )
+			If AVCMF_SUCCESS <> AvCmResult Then
+				If AVCMR_ALREADY_INITIALIZED <> AvCmResult Then
+					Call addMessage(20100, "Ошибка инициализации библиотеки")		
+				End If
+			End If
+			
+			' -- Аутентификация пользователя 
+			AvCmResult = AvCmLogin( 0, 0, AvCmHc,  AVCMF_FORCE_TOKEN_CONTROL)
+			If AVCMR_USER_CANCEL = AvCmResult Then
+				Call addMessage(20101, GetErrorInfo(AvCmResult))
+				Exit Sub	
+			End If
+			If AVCMF_SUCCESS <> AvCmResult Then MsgBox GetErrorInfo(AvCmResult)'Call addMessage(20101, GetErrorInfo(AvCmResult))
+			'===============================
+			'сохраняем дату открытия и дескриптор сессии в профильный документ
+			Call profDoc.Replaceitemvalue("DtAvCmSessionOpen", DtAvCmSessionOpen)
+			Call profDoc.Replaceitemvalue("AvCmHc", me.AvCmHc)
+			Call profDoc.Save(True, False)
+		End If
+
+	End Sub
+	
+	Public Function validateSignature(doc As NotesDocument) As Boolean
+		On Error GoTo errLabel
+		validateSignature = False
+		
+		Set me.curDoc = doc
+		%rem
+		' -- Инициализация библиотеки
+		AvCmResult = AvCmInit( AVCMF_STARTUP )
+		If AVCMF_SUCCESS <> AvCmResult Then
+			If AVCMR_ALREADY_INITIALIZED <> AvCmResult Then
+				Call addMessage(20100, "Ошибка инициализации библиотеки")		
+			End If
+		End If
+		
+		' -- Аутентификация пользователя 
+		AvCmResult = AvCmLogin( 0, 0, AvCmHc,  AVCMF_FORCE_TOKEN_CONTROL)
+		'AvCmResult = AvCmLogin( 0, 0, AvCmHc, AVCM_PASSWORD  ) 
+		If AVCMR_USER_CANCEL = AvCmResult Then
+			Call addMessage(20101, GetErrorInfo(AvCmResult))
+			Exit Function	
+		End If
+		If AVCMF_SUCCESS <> AvCmResult Then Call addMessage(20101, GetErrorInfo(AvCmResult))
+		
+		%end rem
+'		openSession
+		
+		If Not validateAttachments Then Call addMessage(20102, "Нет файлов для проверки подписей")
+		
+		Delete me.curDoc
+		
+		Exit Function	
+errLabel:
+		MsgBox Error & " in line " & Erl
+		Exit Function	
+	End Function
+	
+	Private Sub setTempDirectory
+		tempDir	=	Environ("Temp")
+		If Len(tempDir) = 0 Then tempDir = Environ("Tmp")		
+	End Sub
+	
+	
+	Private Function validateAttachments As Boolean
+		On Error GoTo errLabel
+		Dim stream 	As NotesStream
+		Dim mime 	As NotesMIMEEntity
+		Dim header 	As NotesMIMEHeader
+		Dim result  As Boolean
+		Dim rt 		As NotesRichTextItem
+		Dim count 	As Integer 
+		
+		AMopenSession
+		sess.ConvertMime = False 
+		count 			 = 0
+		Set mime = curDoc.GetMIMEEntity( "File_Attachment" )
+		If Not curDoc.Hasitem("File_Attachment") Then Error 20104, "Нет поля File_Attachment."
+		
+		If mime Is Nothing Then 
+			' -- Файл прикреплен как обычный аттач
+			Set rt = curDoc.GetFirstItem("File_Attachment")
+			ForAll att In rt.EmbeddedObjects
+				If att.Type = EMBED_ATTACHMENT Then
+					Call att.ExtractFile( me.tempDir & "\" & att.Source )
+					Set stream = sess.Createstream()
+						stream.Open me.tempDir & "\" & att.Source
+							Call getSign( stream, att.Source )
+						stream.Truncate
+						stream.Close
+					count = count + 1 
+				End If
+			End ForAll
+		Else
+			'-- Файл прикреплен как mime
+			While Not mime Is Nothing 
+				Set header = mime.GetNthHeader("Content-Disposition")
+				
+				If (Not header Is Nothing) Then
+					If (header.GetHeaderVal(True) = "attachment") Then 
+						Print "Attacment : " & decodeName( header.GetParamVal("filename") )
+						Set stream = sess.Createstream() 
+							stream.Open tempDir & "\" & decodeName( header.GetParamVal("filename") )
+								mime.GetContentAsBytes stream, False 
+								Call getSign( stream, decodeName( header.GetParamVal("filename") ))
+							stream.Truncate
+							stream.Close
+						count = count + 1
+					End If
+				End If	
+				Set mime = mime.GetNextEntity(SEARCH_DEPTH)
+			Wend 
+		End If
+
+		If count = 0 Then
+			validateAttachments = False
+		Else	
+			validateAttachments = True
+		End If	
+
+		
+endf:		
+		sess.ConvertMime 	= True
+		Exit Function	
+errLabel:
+		Call addMessage(20103, Error + " in line " & Erl)
+		sess.ConvertMime 	= True
+		validateAttachments = False 	
+		Exit Function		
+	End Function
+	
+	Private Function getSign( file_stream As NotesStream, fileName As String) As Boolean
+		Dim stream 	As NotesStream
+		Dim mime 	As NotesMIMEEntity
+		Dim header 	As NotesMIMEHeader
+		Dim count	As Integer 
+		Dim sName	As String
+		
+		sess.ConvertMime = False
+		count 			 = 0
+		getSign			 = True
+		Set mime = curDoc.GetMIMEEntity( "Signature" )	
+		If Not curDoc.Hasitem("Signature") Then Error 20104, "Нет поля Signature."
+		
+		If mime Is Nothing Then 
+			' -- Подпись прикреплена как обычный аттач
+			Dim rt 		As NotesRichTextItem
+			Set rt = curDoc.GetFirstItem("Signature") 
+			ForAll att In rt.EmbeddedObjects
+				If att.Type = EMBED_ATTACHMENT Then
+					Print "Signature : " & att.Source
+					If fileName + ".p7s" = att.Source  Then 
+						Call att.ExtractFile( me.tempDir & "\" & att.Source )
+						Set stream = sess.Createstream()
+							stream.Open me.tempDir & "\" & att.Source
+								getSign = checkSign( file_stream, stream, fileName )
+							stream.Truncate
+							stream.Close
+							count = count + 1
+					End If
+				End If
+			End ForAll
+		Else
+			' -- Подпись прикреплена как mime
+			While Not mime Is Nothing 
+				Set header = mime.GetNthHeader("Content-Disposition")
+				
+				If (Not header Is Nothing) Then
+					If (header.GetHeaderVal(True) = "attachment") Then
+						sName = decodeName( header.GetParamVal("filename") )
+						Print sName + " ::: " + getSingFileName(sName)
+						If fileName = getSingFileName(sName) Then 
+							Set stream = sess.Createstream()
+								stream.Open tempDir & "\" & fileName & ".p7s"
+									mime.GetContentAsbytes stream, False
+									getSign = checkSign( file_stream, stream, fileName ) 
+								stream.Truncate
+								stream.Close
+							count = count + 1	
+						End If
+					End If
+				End If	
+				Set mime = mime.GetNextEntity(SEARCH_DEPTH)
+			Wend  	
+		End If
+		
+		sess.ConvertMime = True
+		If count = 0 Then
+			getSign = False
+			Call addMessage( 20105, fileName + " ::: Отсутствуют файлы подписи." )	 
+		End If
+		 
+	End Function
+	
+	Private Function getSingFileName( sName As String ) As String
+		Dim result As String
+			result = StrLeftBack( sName, "_" )
+		getSingFileName = result
+	End Function
+	
+	Private Function checkSign( file_stream As NotesStream, sign_stream As NotesStream, fileName As String ) As Boolean
+		On Error GoTo errLabel
+
+		file_stream.Position = 0
+		sign_stream.Position = 0
+
+		AvCmResult = AvCmOpenMsg( AvCmHc, sign_stream.Readtext, sign_stream.Bytes , hmsg, AVCMF_IN_PKCS7   )
+			If AVCMF_SUCCESS <> AvCmResult Then	GoTo errLabel
+
+		AvCmResult = AvCmSetMsgContent( hmsg, file_stream.readtext, file_stream.Bytes, AVCMF_APPEND )
+			If AVCMF_SUCCESS <> AvCmResult Then	GoTo errLabel
+
+		'AvCmResult = AvCmMsgVerifySignAtIndex( hmsg, 0&, AVCMF_VERIFY_ON_SIGN_DATE )
+		AvCmResult = AvCmMsgVerifySignAtIndex( hmsg, 0&, 0& )
+			If AVCMF_SUCCESS <> AvCmResult Then	GoTo errLabel
+		
+			checkSign = True
+		
+		Call addMessage( 0, fileName + ": [" + getAVCertSubjectInfo( hmsg ) + "] ::: ОК" ) 
+		
+		Exit Function
+errLabel:
+		checkSign 		= True
+		me.errCode 		= AvCmResult
+		me.errMessage 	= me.errMessage + ";" + fileName + ": [" & getAVCertSubjectInfo( hmsg ) & "] ::: " + GetErrorInfo ( AvCmResult )
+		Exit Function				
+	End Function
+	
+	Private Sub addMessage( code As Long, message As String )
+		Dim separator As String
+			separator = ";"
+		If me.errCode > 0 And me.errCode < 0 Then code = me.errCode 
+		me.errCode 		= code
+		If Len( me.errMessage ) = 0 Then separator = "" 
+		me.errMessage 	= me.errMessage + separator	+ message
+	End Sub
+	
+	Private Function getAVCertSubjectInfo( hmsg As Long ) As String
+		On Error GoTo errLabel
+		Dim result(2) 		As String
+		Dim AvCmResult 		As Long, hsign As Long, hcert As Long
+		Dim buff_size 		As Long, buff_size2 As Long,  i As Integer
+		Dim attr_oid 		As String, attr_val As String, attr_count As String
+
+		result(0) = ""
+		result(1) = ""
+
+		AvCmResult = AvCmGetMsgSign( hmsg, 0&, hsign, 0&)
+		If AvCmResult <> 0 Then MsgBox  GetErrorInfo ( AvCmResult )
+		
+		AvCmResult = AvCmFindCertBySign( hsign, hcert, 0& )
+		If AvCmResult <> 0 Then MsgBox  GetErrorInfo ( AvCmResult )
+
+		AvCmResult = AvCmGetCertAttr( hcert, AVCM_SUBJECT_ATTR_COUNT, 0&, attr_count, buff_size, AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+		If AvCmResult <> 0 Then MsgBox  GetErrorInfo ( AvCmResult )
+		
+		For i = 0 To Asc( attr_count ) - 1  
+			attr_oid 	= ""
+			attr_val 	= ""
+			buff_size	= 0
+			buff_size2  = 0
+			AvCmResult = AvCmGetCertAttr1( hcert, AVCM_SUBJECT_ATTR, 	 CLng(i), attr_val, buff_size,  AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+			AvCmResult = AvCmGetCertAttr1( hcert, AVCM_SUBJECT_ATTR_OID, CLng(i), attr_oid, buff_size2, AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+			
+			If AvCmResult = 0 Then
+				attr_val = Left( ConvertPAnsi( attr_val, "Windows-1251"), buff_size - 1)
+				attr_oid = Left( ConvertPAnsi( attr_oid, "Windows-1251"), buff_size2- 1)
+				
+				If attr_oid = "2.5.4.41" Then
+					result(1) =  attr_val
+				ElseIf attr_oid = "2.5.4.4" Then
+					result(0) = attr_val
+				End If 
+			End If	
+		Next
+			getAVCertSubjectInfo = result(0) + " " + result(1)		
+	errLabel:	
+		If AVCMF_NULL <> hcert Then Call AvCmCloseHandle( hcert, 0&)
+		If AVCMF_NULL <> hsign Then Call AvCmCloseHandle( hsign, 0&)
+		Exit Function	
+	End Function
+	
+	
+	
+	Function decodeName ( txtName As String ) As String
+		Dim docTemp 	As NotesDocument
+		Dim body 		As NotesMIMEEntity
+		Dim stream		As NotesStream
+		
+		Set docTemp = sess.CurrentDatabase.CreateDocument
+		Set body    = docTemp.CreateMIMEEntity
+		Set stream  = sess.CreateStream
+			sess.ConvertMIME = False
+			stream.Writetext Replace( Replace( txtName, |=?UTF-8?B?|, "" ),|?=|, "" )
+		Call body.SetContentFromText ( stream, "text/plain;charset=UTF-8", ENC_BASE64)
+			stream.Truncate
+		Call body.GetContentAsText ( stream, True)
+			stream.Position		= 0 
+			decodeName 			= stream.Readtext
+			sess.ConvertMIME 	= True
+	End Function
+	
+	Function ConvertPAnsi( ByVal strInput As String, ByVal chrset As String ) As String 
+		Dim sess 	As New NotesSession
+		Dim stream  As NotesStream
+		Dim db 		As NotesDatabase
+		Dim doc 	As NotesDocument
+		Dim mime 	As NotesMIMEEntity
+		
+		sess.ConvertMIME = False
+		
+		Set db 		= sess.CurrentDatabase
+		Set doc 	= db.CreateDocument
+		Set mime 	= doc.CreateMIMEEntity("Body")
+		Set stream 	= sess.createStream
+			stream.Writetext strInput 
+			stream.Position = 0
+		Call mime.Setcontentfrombytes( stream, "text/plain; charset=" & chrset, ENC_NONE)
+		ConvertPAnsi = mime.ContentAsText
+		sess.ConvertMIME = True
+	End Function
+	
+	
+	Public Property Get getErrorCode As Long
+		getErrorCode = me.errCode	
+	End Property
+	
+	Public Property Get getErrorMessage As String
+		getErrorMessage = me.errMessage		
+	End Property
+	
+End Class
+Sub Initialize
+	
+End Sub
+
+
+Sub Terminate
+	
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%REM
+	Sub SignV2
+	Description: Comments for Sub
+%END REM
+Public Function AvestAvCmSign( stream_in As NotesStream, stream_out As NotesStream ) As Long 
+	On Error GoTo errLabel
+'	Dim AvCmHc 			As Long 			' -- Указатель на дескриптор сессии.
+	Dim AvCmResult 		As Long, W As Long
+	Dim input_message   As String
+	Dim output_buff 	As String
+
+	AvestAvCmSign 	= AVCMF_SUCCESS
+	input_message	= stream_in.ReadText
+	
+	AvCmHc = AMopenSession()
+	
+	' -- Инициализация библиотеки
+'	AvCmResult = AvCmInit( AVCMF_STARTUP )
+'		If AVCMF_SUCCESS <> AvCmResult Then Error 20100, "Ошибка инициализации библиотеки" 
+	
+	' -- Аутентификация пользователя 
+'	AvCmResult = AvCmLogin( 0, 0, AvCmHc, AVCMF_FORCE_TOKEN_CONTROL  )
+'		If AVCMF_SUCCESS <> AvCmResult Then Error 20101, "Ошибка логина"
+		
+	' -- подписываем и получаем размер блоба	
+	AvCmResult = AvCmSign( AvCmHc, input_message, Len( input_message ), ByVal 0&, W, AVCMF_DETACHED Or AVCMF_IN_RAW_DATA Or AVCMF_ADD_SIGN_CERT)
+		output_buff = String( W, Chr$(0) )
+		If AVCMF_SUCCESS <> AvCmResult Then Error 20102, "Ошибка получения блоба сообщения" 
+			
+	' -- передаем сообщение в output_buff	
+	AvCmResult = AvCmSign2( AvCmHc, input_message, Len( input_message ), output_buff, W, AVCMF_DETACHED Or AVCMF_IN_RAW_DATA Or AVCMF_ADD_SIGN_CERT)
+		If AVCMF_SUCCESS <> AvCmResult Then Error 20103, "Ошибка получения сообщения"
+	
+	
+	'-- не очень удачная идея. 
+	'-- оверфлов поймать как здравствуй ( если вкладывать файл в сообщение например)	 
+	Dim bytearr() 			As Byte, i As Integer
+	ReDim bytearr(1 To w) 	As Byte
+	For i = 1 To w
+		bytearr(i) = CByte( Asc( Mid(output_buff, i, 1) ))
+	Next
+		stream_out.Truncate
+		stream_out.Write bytearr
+		stream_out.position = 0
+		
+errLabel:
+	AvestAvCmSign = AvCmResult
+	
+	If AvCmHc <> 0 Then 
+'		Print "AvCmLogout ::: " & GetErrorInfo ( AvCmLogout( AvCmHc, 0) ) 	'-- Logout from library
+	End if	
+	
+'	Print "AvCmInit(SHUTDOWN)   ::: " & GetErrorInfo ( AvCmInit(AVCMF_SHUTDOWN) )	'-- Shutdown library session
+	
+	If Err <> 0 And AvCmResult <> AVCMR_USER_CANCEL Then
+		Print "AvestAvCmSign error : " + CStr( Error ) + " in line " + CStr( Erl )  
+	End If
+Exit function	
+End Function
+
+
+
+
+
+
+
+
+
+
+
+
+ Function AMopenSession() As Long
+		
+		Dim profDoc As NotesDocument
+		Dim dtNow As New NotesDateTime(Now)
+		Dim sess As New NotesSession
+		
+		Set profDoc = sess.Currentdatabase.Getprofiledocument("(Profile)", sess.Commonusername)
+		If profDoc.Hasitem("DtAvCmSessionOpen") Then 
+			Set DtAvCmSessionOpen = New NotesDateTime(profDoc.DtAvCmSessionOpen(0))
+		End If
+		If profDoc.Hasitem("AvCmHc") Then 
+			AvCmHc = CLng(profDoc.AvCmHc(0))
+		End If
+		
+		If DtAvCmSessionOpen Is Nothing Then Set DtAvCmSessionOpen = New NotesDateTime (Now)
+		If dtNow.Timedifference(DtAvCmSessionOpen) > 4*60*60 Then
+			Call AMcloseSession()
+			AvCmHc = 0
+			'Set DtAvCmSessionOpen = New NotesDateTime (Now) 
+			Set DtAvCmSessionOpen = New NotesDateTime (Now)
+		End If
+		
+		If AvCmHc = 0  Then
+			'===========Авторизация пользователя====================
+			AvCmResult = AvCmInit( AVCMF_STARTUP )
+			If AVCMF_SUCCESS <> AvCmResult Then
+				If AVCMR_ALREADY_INITIALIZED <> AvCmResult Then
+'					Call addMessage(20100, "Ошибка инициализации библиотеки")		
+				End If
+			End If
+			
+			' -- Аутентификация пользователя 
+			AvCmResult = AvCmLogin( 0, 0, AvCmHc,  AVCMF_FORCE_TOKEN_CONTROL)
+			If AVCMR_USER_CANCEL = AvCmResult Then
+'				Call addMessage(20101, GetErrorInfo(AvCmResult))
+				Exit Function	
+			End If
+			If AVCMF_SUCCESS <> AvCmResult Then MsgBox GetErrorInfo(AvCmResult)'Call addMessage(20101, GetErrorInfo(AvCmResult))
+			'===============================
+			'сохраняем дату открытия и дескриптор сессии в профильный документ
+			Call profDoc.Replaceitemvalue("DtAvCmSessionOpen", DtAvCmSessionOpen)
+			Call profDoc.Replaceitemvalue("AvCmHc", AvCmHc)
+			Call profDoc.Save(True, False)
+		End If
+	 AMopenSession = AvCmHc
+
+	End Function
+Function decodeName ( txtName As String ) As String
+	Dim sess 		As New NotesSession
+	Dim docTemp 	As NotesDocument
+	Dim body 		As NotesMIMEEntity
+	Dim stream		As NotesStream
+		
+		Set docTemp = sess.CurrentDatabase.CreateDocument
+		Set body    = docTemp.CreateMIMEEntity
+		Set stream  = sess.CreateStream
+		sess.ConvertMIME = False
+			stream.Writetext Replace( Replace( txtName, |=?UTF-8?B?|, "" ),|?=|, "" )
+		Call body.SetContentFromText ( stream, "text/plain;charset=UTF-8", ENC_BASE64)
+			stream.Truncate
+		Call body.GetContentAsText ( stream, True)
+			stream.Position = 0 
+			decodeName = stream.Readtext
+		sess.ConvertMIME = True
+	End Function
+	
+	
+
+Function StreamToText(streamIn As NotesStream, ByVal chrset$)
+	Dim session As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim mime As NotesMIMEEntity
+	
+	Set db 		= session.CurrentDatabase
+	Set doc 	= db.CreateDocument
+	Set mime 	= doc.CreateMIMEEntity("Body")
+		streamIn.Position = 0
+	Call mime.SetContentFromBytes(streamIn, "text/plain; charset=" & chrset, ENC_NONE)
+		StreamToText = mime.ContentAsText
+End Function
+Public Function getAVCertSubjectInfo( hcert As Long ) As Variant
+	Dim AvCmResult 		As Long
+	Dim attr_res List 	As Variant
+	Dim buff_size 		As Long,   i As Integer
+	Dim attr_oid 		As String, attr_val As String, attr_count As String
+
+	AvCmResult = AvCmGetCertAttr( hcert, AVCM_SUBJECT_ATTR_COUNT, 0&, attr_count, buff_size, AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+	
+	For i = 0 To Asc( attr_count ) - 1  
+		attr_oid 	= ""
+		attr_val 	= ""
+		AvCmResult = AvCmGetCertAttr1( hcert, AVCM_SUBJECT_ATTR_OID, CLng(i), attr_oid, buff_size, AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+		AvCmResult = AvCmGetCertAttr1( hcert, AVCM_SUBJECT_ATTR, 	 CLng(i), attr_val, buff_size, AVCMF_ATTR_BY_NUM Or AVCMF_ALLOC )
+		
+		If AvCmResult = 0 Then
+			attr_val = StreamToText2( attr_val, "Windows-1251")
+			attr_oid = StreamToText2( attr_oid, "Windows-1251")
+				attr_res( attr_oid ) = CStr(attr_val) 
+		End If	
+	Next
+		getAVCertSubjectInfo = attr_res
+End function
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%REM
+	Function AvestAvCmSignCollection
+	Description: Comments for Function
+%END REM
+Static Public Function AvestAvCmSignCollection(signcol As NotesDocumentCollection, dbStrore As NotesDatabase , bodyFieldName As String) As NotesDocument 
+	'signcol - коллекция документов в базе (без файла) 
+	On Error GoTo errLabel
+	Dim ns 				As New NotesSession
+	Dim db 				As NotesDatabase
+	Dim agent 			As NotesAgent
+	Dim imgdoc 			As NotesDocument
+	Dim storedoc		As NotesDocument
+	Dim AvCmHc 			As Long 			' -- Указатель на дескриптор сессии.
+	Dim AvCmResult 		As Long
+	Dim stream_in 		As NotesStream
+	Dim stream_out		As NotesStream
+	Dim rtitem 			As NotesRichTextItem
+	Dim sign 			As NotesRichTextItem
+	Dim result 			As Long
+	Dim W				As Long
+	Dim TmpDir 			As String
+	Dim TmpFile 		As String
+	Dim input_message   As String
+	Dim output_buff 	As String
+	Dim bytearr() 		As Byte
+	Dim i 				As Integer
+	Dim tm 				As NotesDateTime
+	Dim sign_time 		As Variant
+	Dim errorItem 		As Notesitem
+	
+	Set AvestAvCmSignCollection = New NotesDocument(ns.Currentdatabase)
+	
+	AvestAvCmSignCollection.error_code 	= 0
+	AvestAvCmSignCollection.error_msg 	= ""
+	AvestAvCmSignCollection.signcount 	= 0
+	Set errorItem = AvestAvCmSignCollection.Getfirstitem("error_msg")
+	
+	If signcol.Count = 0 Then Exit Function
+	
+	AvCmHc = AMopenSession()
+%rem
+	' -- Инициализация библиотеки
+	AvCmResult = AvCmInit( AVCMF_STARTUP )
+	If AVCMF_SUCCESS <> AvCmResult Then
+		'Error 20100, "Ошибка инициализации библиотеки"
+		AvestAvCmSignCollection.error_code 	= LIB_NOT_INIT
+		Call errorItem.appendToTextList(GetErrorInfo(LIB_NOT_INIT))
+		Exit Function	
+	End If
+	
+	' -- Аутентификация пользователя 
+	AvCmResult = AvCmLogin( 0, 0, AvCmHc, AVCMF_FORCE_TOKEN_CONTROL)
+	If AVCMF_SUCCESS <> AvCmResult Then
+		'Error 20101, "Ошибка логина"
+		Print "AvCmInit(SHUTDOWN)   ::: " & GetErrorInfo ( AvCmInit(AVCMF_SHUTDOWN) )	'-- Shutdown library session
+		If AvCmResult = AVCMR_USER_CANCEL Then
+			AvestAvCmSignCollection.error_code 	= -1
+			Exit Function	
+		End If
+		AvestAvCmSignCollection.error_code 	= AvCmResult
+		Call errorItem.appendToTextList(GetErrorInfo(AvCmResult))
+		Exit Function	
+	End If
+%end rem
+	
+	If bodyFieldName = "" Then bodyFieldName = "Body"
+	TmpDir = getTempPath()
+	
+	Set imgdoc = signcol.Getfirstdocument()
+	Set db = imgdoc.Parentdatabase 
+	While Not imgdoc Is Nothing 
+		Set storedoc = getDocumentByID(imgdoc.IDSTORE(0),dbStrore)
+		If Not storedoc Is Nothing Then
+			If storedoc.Hasitem(bodyFieldName) Then
+				Set rtitem = storedoc.GetFirstItem( bodyFieldName )	
+				If ( rtitem.Type = RICHTEXT ) = True Then
+					ForAll o In rtitem.EmbeddedObjects 
+						If ( o.Type = EMBED_ATTACHMENT ) Then 
+							TmpFile = TmpDir & o.Source
+							o.ExtractFile (TmpFile)
+						End If
+					End ForAll
+					Set stream_in = ns.CreateStream		
+					If stream_in.Open( TmpFile ) Then
+						input_message	= stream_in.ReadText
+						Set stream_out = ns.CreateStream
+						Call stream_out.Open(TmpFile + ".p7s" )
+						' -- подписываем и получаем размер блоба	
+						AvCmResult = AvCmSign( AvCmHc, input_message, Len( input_message ), ByVal 0&, W, AVCMF_DETACHED Or AVCMF_IN_RAW_DATA Or AVCMF_ADD_SIGN_CERT)
+						output_buff = String( W, Chr$(0) )
+						If AVCMF_SUCCESS <> AvCmResult Then
+							Call errorItem.AppendTotextList(GetErrorInfo(AvCmResult))
+						Else
+							' -- передаем сообщение в output_buff
+							AvCmResult = AvCmSign2( AvCmHc, input_message, Len( input_message ), output_buff, W, AVCMF_DETACHED Or AVCMF_IN_RAW_DATA Or AVCMF_ADD_SIGN_CERT)
+							If AVCMF_SUCCESS = AvCmResult Then
+								ReDim bytearr(1 To w) 	As Byte
+								For i = 1 To w
+									bytearr(i) = CByte( Asc( Mid(output_buff, i, 1) ))
+								Next
+								stream_out.Truncate
+								stream_out.Write bytearr
+								stream_out.position = 0
+								Set tm = New NotesDateTime(Now)
+								stream_in.Close
+								stream_out.Close
+								If imgdoc.Hasitem("Signature") Then
+									Set sign = imgdoc.GetFirstItem("Signature")
+								Else
+									Set sign = New NotesRichTextItem( imgdoc ,"Signature")
+								End If
+								If Not imgdoc.hasitem("SignTime") Then imgdoc.SignTime = ""
+								Set sign_time = imgdoc.GetFirstItem("SignTime")
+								Call sign_time.Appendtotextlist(Format$(tm.LsGMTTime, "yyyy-mm-ddThh:nn:ssZ"))
+								Call sign.EmbedObject(EMBED_ATTACHMENT, "", TmpFile + ".p7s")
+								Call imgdoc.Save(True, False)
+								Set agent 	= db.GetAgent("wf.save.sign")
+								If Not agent Is Nothing Then
+									Call agent.RunOnServer(imgdoc.noteID)	
+								End If
+								AvestAvCmSignCollection.signcount = AvestAvCmSignCollection.signcount(0) + 1
+							End If
+						End If
+					End If
+					Kill TmpFile
+					Kill TmpFile + ".p7s"
+				End If
+			End If	
+		End If
+		Set imgdoc = signcol.Getnextdocument(imgdoc)
+	Wend 
+	'***********************************************************************************
+	
+errLabel:
+	If AvCmHc <> 0 Then 
+'		Print "AvCmLogout ::: " & GetErrorInfo ( AvCmLogout( AvCmHc, 0) ) 	'-- Logout from library
+	End If	
+	
+'	Print "AvCmInit(SHUTDOWN)   ::: " & GetErrorInfo ( AvCmInit(AVCMF_SHUTDOWN) )	'-- Shutdown library session
+	
+	If Err <> 0 And AvCmResult <> AVCMR_USER_CANCEL Then
+		AvestAvCmSignCollection.error_code 	= Err
+		Call errorItem.appendToTextList(Error$)
+		Print "AvestAvCmSignCollection error : " + CStr( Error ) + " in line " + CStr( Erl )  
+	End If
+	Exit Function	
+End Function
+Function StreamToText2( ByVal strInput As String, ByVal chrset As String ) As String 
+	Dim sess 	As New NotesSession
+	Dim stream  As NotesStream
+	Dim db 		As NotesDatabase
+	Dim doc 	As NotesDocument
+	Dim mime 	As NotesMIMEEntity
+	
+	Set db 	= sess.CurrentDatabase
+	Set doc = db.CreateDocument
+		doc.Form = "12312312312"
+	Set mime 	= doc.CreateMIMEEntity("Body")
+	Set stream 	= sess.createStream
+		stream.Writetext strInput 
+		stream.Position = 0
+	Call mime.Setcontentfrombytes( stream, "text/plain; charset=" & chrset, ENC_NONE)
+	StreamToText2 = mime.ContentAsText
+		stream.Close
+		Delete doc
+
+End Function
+
+
+Public Sub AMcloseSession()
+		If AvCmHc 	<> AVCMF_NULL 	Then
+			Print "AvCmLogout ::: " 		& GetErrorInfo ( AvCmLogout( AvCmHc, 0) ) 	'-- Logout from library
+		End If
+		Print "AvCmInit(SHUTDOWN)   ::: " 	& GetErrorInfo ( AvCmInit(AVCMF_SHUTDOWN) )	'-- Shutdown library session
+	End Sub
+Public Function GetErrorInfo1 ( error_code As Long ) As String
+	Dim result As String 
+	
+	If error_code = 0 Then 
+		GetErrorInfo1 = "SUCCESS"
+		Exit function
+	End If
+	
+	Select Case error_code
+		Case AVCMR_ALLOC_ERROR 							: result = "Ошибка при распределении памяти"
+		Case AVCMR_BAD_ATTR 							: result = "Идентификатор атрибута неверен"
+		Case AVCMR_BAD_FORMAT 							: result = "Неверный формат сообщения"
+		Case AVCMR_NOT_INITIALIZED 						: result = "Библиотека не была инициализирована"
+		Case AVCMR_BAD_FLAGS 							: result = "Функции переданы неверные флаги"
+		Case AVCMR_BAD_HANDLE 							: result = "Дескриптор объекта неверен"
+		Case AVCMR_BAD_HC 								: result = "Дескриптор соединения неверен"
+		Case AVCMR_BAD_HCERT 							: result = "Дескриптор сертификата неверен"
+		Case AVCMR_BAD_HENUM 							: result = "Дескриптор перебора сертификатов неверен"
+		Case AVCMR_BAD_HMSG 							: result = "Дескриптор открытого сообщения неверен"
+		Case AVCMR_BAD_HSIGN 							: result = "Дескриптор подписи неверен"	
+		Case AVCMR_BAD_NUMBER 							: result = "В сообщении нет подписи с указанным номером"
+		Case AVCMR_BAD_PASSWORD 						: result = "Пароль неверен"
+		Case AVCMR_BUFFER_TOO_SMALL						: result = "Выходной буфер слишком мал"
+		Case AVCMR_CERT_NOT_FOUND						: result = "Не найден личный сертификат"
+		Case AVCMR_CERT_CA_INVALID						: result = "Подпись под сертификатом издателя неверна"
+		Case AVCMR_CERT_CA_NOT_FOUND					: result = "Сертификат издателя не найден"
+		Case AVCMR_CERT_EXPIRED							: result = "Срок действия личного ключа сертификата неверен"
+		Case AVCMR_CERT_NOT_FOR_CRYPT					: result = "Сертификат не предназначен для шифрования"
+		Case AVCMR_CERT_NOT_FOR_SIGN					: result = "Сертификат не предназначен для подписи"
+		Case AVCMR_CERT_SIGN_INVALID					: result = "Подпись под сертификатом неверна"
+		Case AVCMR_CERT_STORE_NOT_FOUND					: result = "Не найдено или пусто хранилище сертификатов"
+		Case AVCMR_CONTAINER_NOT_FOUND					: result = "Не найден контейнер с личными ключами на носителе"
+		Case AVCMR_CRL_INVALID							: result = "Подпись под СОС издателя неверна или СОС устарел"
+		Case AVCMR_CRL_NOT_FOUND						: result = "СОС издателя не найден"
+		Case AVCMR_DB_NOT_FOUND							: result = "Невозможно подключится к базе данных"
+		Case AVCMR_DEVICE_NOT_FOUND						: result = "Не найден носитель"
+		Case AVCMR_BUSY									: result = "Невозможно закрыть объект, объект занят"
+		Case AVCMR_NO_DB_PARAMS							: result = "Не указаны параметры подключения к базе данных"
+		Case AVCMR_NO_INPUT								: result = "Входное сообщение имеет нулевой размер"
+		Case AVCMR_NO_SIGN								: result = "Сообщение не имеет подписи, выработанной на ключа данного сертификата"
+		Case AVCMR_ALREADY_INITIALIZED					: result = "Повторная попытка инициализации библиотеки"
+		Case AVCMR_BAD_DATE								: result = "Формат даты/времени некорректен"
+		Case AVCMR_BAD_THREAD							: result = "Попытка обратится к сессии, созданной в одном потоке, из другого потока"
+		Case AVCMR_DATE_NOT_VALID						: result = "Дата не подходящая"
+		Case AVCMR_INTERNAL_ERROR						: result = "Внутренняя ошибка библиотеки"
+		Case AVCMR_NOT_FOUND							: result = "Объект не найден"
+		Case AVCMR_NOT_IMPLEMENTED						: result = "Функция не реализована"
+		Case AVCMR_SIGN_INVALID							: result = "Подпись неверна"
+		Case AVCMR_USER_NO_AUTH							: result = "Сессия создана без авторизации пользователя"
+		Case AVCMR_BAD_PARAM							: result = "Параметр функции неверен"
+		Case AVCMR_BAD_FORMED_SIGN						: result = "Неверный формат подписи СТБ"
+		Case AVCMR_AVCSP_INIT_FAILED					: result = "Инициализация криптопровайдера Авест завершилась неудачно"
+		Case AVCMR_REGISTRY_ERROR						: result = "Ошибка доступа к реестру Windows"
+		Case AVCMR_WIN32_ERROR							: result = "Произошла ошибка при вызове функций Win32"
+		Case AVCMR_OTHER_RECIPIENT						: result = "Невозможно расшифровать сообщение: среди сертификатов получателей сообщения отсутствует личный сертификат аутентифицированного пользователя"
+		Case AVCMR_CTL_NOT_FOUND						: result = "Не найден СДЦС (список доверяемых центров сертификации)"
+		Case AVCMR_CERT_REVOKED							: result = "Сертификат отозван"
+		Case AVCMR_CERT_NOT_TRUSTED						: result = "Нет доверия сертификату"
+		Case AVCMR_CRL_EXPIRED							: result = "Срок действия СОС истек"
+		Case AVCMR_CRL_ISSUER_NOT_FOUND 				: result = "Сертификат издателя СОС не найден"
+		Case AVCMR_CRL_ISSUER_EXPIRED					: result = "Срок действия сертификата издателя СОС истек"
+		Case AVCMR_CERT_STORE_BAD_VERSION				: result = "Версия библиотеки не соответствует версии хранилища сертификатов."
+		Case AVCMR_MY_STORE_EMPTY						: result = "В личном хранилище отсутствуют действующие сертификаты."
+		Case AVCMR_USER_CANCEL							: result = "Действие отменено пользователем."
+		Case AVCMR_RA_EXT_KEY_USAGE_NOT_ALLOWED			: result = "Сертификат содержит расширенное использование ключа не поддерживаемое центром регистрации"
+		Case AVCMR_RA_EXT_NOT_ALLOWED					: result = "Сертификат содержит дополнение не поддерживаемое центром регистрации."
+		Case AVCMR_TOO_MANY_CERT						: result = "В личном справочнике несколько действующих сертификатов"
+		Case AVCMR_PARAM_SPEC_NOT_FOUND					: result = "Параметр поиска не существует"
+		Case AVCMR_CERT_NOT_RA							: result = "Сертификат не является сертификатом ЦР"
+		Case AVCMR_ALREADY_EXISTS						: result = "Объект уже существует"
+		Case AVCMR_UNKNOWN_ERROR_CODE					: result = "Код ошибки неизвестен библиотеке"
+		Case AVCMR_BAD_CRL_ISSUER						: result = "Издатель СОС отличается от ожидаемого издателя, переданного параметром AVCM_CRL_ISSUER_SUBJECT"
+		Case AVCMR_OLD_CRL								: result = "В справочнике списков отозванных сертификатов имеется более новый СОС данного издателя"
+		Case AVCMR_BAD_HCRL								: result = "Дескриптор СОС неверен"
+		Case AVCMR_CERT_TEMPORARY_REVOKED				: result = "Сертификат временно приостановлен"
+		Case AVCMR_REPEAT_AUTHENTICATION_ERROR			: result = " Ошибка подтверждения пароля при повторной аутентификации. Вставлен неверный носитель или неверно задан личный пароль."
+		Case AVCMR_DB_AUTHENTICATION_ERROR				: result = "Нет прав доступа к базе сертификации."
+		Case AVCMR_TOKEN_NOT_FOUND						: result = "Носитель с личным ключом не установлен."
+		Case AVCMR_NO_CONTENT							: result = "Сообщение не имеет содержимого."
+		Case AVCMR_CERT_NOT_VALID_YET					: result = "Срок действия сертификата не наступил."
+		Case AVCMR_CERT_ALREADY_EXPIRED					: result = "Срок действия сертификата истек."
+		Case AVCMR_INVALID_TOKEN						: result = "Носитель не зарегистрирован."
+		Case AVCMR_BAD_KEY								: result = "Ошибка расшифрования ключа."
+		Case AVCMR_TOKEN_WRITE_ERROR					: result = "Ошибка записи на носитель."
+		Case AVCMR_REQUEST_DENIED						: result = "сертификат не найден, но найден отказ УЦ в выдаче сертификата по данному запросу."
+		Case AVCMR_BAD_BUFFER_PTR						: result = "Передан некорректный указатель на выходной буфер."
+		Case AVCMR_OBJ_LOCKED							: result = "Объект заблокирован другим приложением."
+		Case AVCMR_NO_RECIPIENTS						: result = "Отсутствуют получатели зашифрованного сообщения."
+		Case AVCMR_ALG_NOT_SUPPORTED					: result = "Алгоритм не поддерживается."
+		Case AVCMR_CERT_NOT_REVOKED						: result = "Сертификат не отозван."
+		Case AVCMR_REQUEST_FOR_CA_DENIED				: result = "Невозможно зарегистрировать запрос на сертификат УЦ CA."
+		Case AVCMR_REQUEST_FOR_RA_DENIED				: result = "Невозможно зарегистрировать запрос на сертификат УЦ RA."
+		Case AVCMR_REQUEST_FOR_REVOKE_DENIED			: result = "РЦ не имеет права на выполнение данной операции."
+		Case AVCMR_INVALID_BASIC_CONSTRAINTS			: result = "УЦ не имеет права выдавать сертификаты или не может является конечным сертификатом."
+		Case AVCMR_CRYPTSQL_SYNTAX_ERROR				: result = "Синтаксическая ошибка AvCryptSQL."
+		Case AVCMR_NOT_CONDITION						: result = "Сертификат/СОС не удовлетворяет условиям отбора."
+		Case AVCMR_VERIFY_ERROR							: result = "Не удалось проверить ЭЦП. Возможно, потеряно соединение с AvHSM."
+		Case AVCMR_BAD_DATA								: result = "Нарушена целостность входных данных."
+		Case AVCMR_ORIGINAL_FILE_FOR_VERIFY_NOT_FOUND 	: result = "Не найден оригинальный файл для проверки подписи."
+		Case AVCMR_CERT_NOT_FOR_SIGN_CERT 				: result = "Сертификат не предназначен для подписи сертификатов."
+		Case AVCMR_CERT_NOT_FOR_SIGN_CRL 				: result = "Сертификат не предназначен для подписи СОС."
+		Case AVCMR_CERT_UNKNOWN_CRITICAL_EXT 			: result = "Сертификат содержит неизвестное критическое дополнение."
+		Case AVCMR_CRL_UNKNOWN_CRITICAL_EXT 			: result = "СОС содержит неизвестное критическое дополнение."
+		Case AVCMR_INVALID_KEY_USAGE 					: result = "Применение ключа задано неверно."
+		Case AVCMR_INVALID_RACERT 						: result = "Сертификат РЦ выпущен другим УЦ."
+		Case AVCMR_CRLSERVER_ERROR 						: result = "AVCMR_CRLSERVER_ERROR"
+		Case AVCMR_LOADLIBPKCS11_ERROR 					: result = "Ошибка загрузки библиотеки PKCS#11"
+		Case AVCMR_CRLDP_BAD_PATH 						: result = "Неверно задан путь к точкам распространения СОС"
+		Case AVCMR_CRLDP_BAD_PATH 						: result = "Атрибуты запроса на сертификат имеют отличия от атрибутов продлеваемого сертификата"
+		Case AVCMR_POLICY_NOT_FOUND 					: result = "AVCMR_POLICY_NOT_FOUND"
+		Case AVCMR_POLICY_NOT_APPLY 					: result = "AVCMR_POLICY_NOT_APPLY"
+		Case AVCMR_CERT_NOT_FOR_SIGN_ACERT 				: result = "Сертификат не предназначен для подписи атрибутных сертификатов"
+		Case AVCMR_OCSP_ERROR	 						: result = "Ошибка при обращении к OCSP серверу"
+		Case AVCMR_KEY_ALREADY_EXPIRED					: result = "Срок личного ключа истек"
+		Case AVCMR_PKCS11_TOKEN_NOT_PRESENTERROR 		: result = "Носитель не установлен"
+		Case AVCMR_PKCS11_ERROR 						: result = "Ошибка при вызове функции PKCS#11"
+		Case AVCMR_LDAP_ACTION_NOT_FOUND 				: result = "Не выбрано действие для сохранения объекта в LDAP"
+		Case AVCMR_SCEP_PENDING 						: result = "Запрос на сертификат ждет ручного утверждения"
+		Case AVCMR_SCEP_ERROR 							: result = "Ошибка при обращении к серверу SCEP"
+		Case Else 
+			result = "Unknown error " + CStr( error_code )
+	End Select
+		GetErrorInfo1 = result
+End Function
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
