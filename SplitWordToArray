@@ -1,0 +1,16 @@
+Function SplitWordToArray(ts As String)As Variant
+	Dim arr() As Variant
+	Dim i As Integer
+	
+	If ts <> "" Then
+		ReDim Preserve arr(Len(ts) - 1)
+		For i = 1 To Len(ts)
+			arr(i-1) = Mid$(ts, i, 1)
+		Next
+	Else
+		SplitWordToArray = Null
+		Exit Function 
+	End If
+	SplitWordToArray = arr
+	
+End Function
