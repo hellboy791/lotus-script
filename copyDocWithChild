@@ -1,0 +1,106 @@
+Option Public
+Option Declare
+Use "(lwo.wf.sys.setup)"
+Sub Initialize
+	On Error GoTo errh
+	
+	Dim s As New NotesSession
+	Dim ws As New NotesUIWorkspace
+	Dim curDB As NotesDatabase
+	Dim targetDB As NotesDatabase
+	Dim storeDB As NotesDatabase
+	Dim targetStoreDB As NotesDatabase
+	Dim viewByDocID As NotesView
+	Dim view As NotesView
+	Dim col As NotesDocumentCollection
+	Dim var As Variant
+	Dim colChild As NotesDocumentCollection
+	Dim curDoc As NotesDocument
+	Dim newDoc As NotesDocument
+	Dim childDoc As NotesDocument
+	Dim newChildDoc As NotesDocument
+	Dim storeDoc As NotesDocument
+	Dim newStoreDoc As NotesDocument
+	Dim childCol As NotesDocumentCollection
+	Dim responses As NotesDocumentCollection
+	Dim sf As String
+
+	Set curDB = s.Currentdatabase
+	var = ws.Prompt(13, "Выбор базы", "Выберите базу, в которую хотите копировать документы")
+	If IsEmpty(var) Then Exit Sub
+	Set targetDB = s.Getdatabase(var(0), var(1), False)
+	
+	Set col = curDB.Unprocesseddocuments
+	Set curDoc = col.Getfirstdocument()
+	While Not curDoc Is Nothing
+		If curDoc.Form(0) = "(wf.base.doc)" Then
+			Set newDoc = curDoc.Copytodatabase(targetDB)
+			sf = {appID = "} + curDoc.docID(0) + {" | parentID = "} + curDoc.docID(0) + {"}
+			Set childCol = curDB.Search(sf, Nothing, 0)
+			If col.Count > 0 Then
+				Set childDoc = childCol.Getfirstdocument()
+				While Not childDoc Is Nothing 
+					If childDoc.Universalid <> curDoc.Universalid Then
+						Set newChildDoc = childDoc.Copytodatabase(targetDB)
+						'если дочерний док является ответом, делаем его ответом на скопированный основной документ
+						If newChildDoc.Isresponse Then Call newChildDoc.Makeresponse(newDoc)
+						'пытаемся найти документ в опер хранилище и скопировать в наше	
+						If childDoc.Form(0) = "(file.store.link)" Then
+							If storeDB Is Nothing Then Set storeDB = s.Getdatabase(childDoc.StoreServer(0), childDoc.StorePath(0), False)
+							If Not storeDB Is Nothing Then
+								If viewByDocID Is Nothing Then Set viewByDocID = storeDB.Getview("(wf.all.docs.by.docid)")
+								If Not viewByDocID Is Nothing Then
+									If targetStoreDB Is Nothing Then Set targetStoreDB = getDBFromTurgetDB("7", targetDB)
+									If Not targetStoreDB Is Nothing Then
+										Set storeDoc = viewByDocID.Getdocumentbykey(childDoc.IDStore(0), False)
+										If Not storeDoc Is Nothing Then
+											Set newStoreDoc = storeDoc.Copytodatabase(targetStoreDB)
+											Call newChildDoc.Replaceitemvalue("StoreServer", targetStoreDB.Server)
+											Call newChildDoc.Replaceitemvalue("StorePath", targetStoreDB.Filepath)
+											Call newChildDoc.Save(True, False)
+										End If
+									End If
+								End If
+							End If
+						End If
+					End If
+					Set childDoc = childCol.Getnextdocument(childDoc)
+				Wend
+			End If
+		End If
+		Set curDoc = col.Getnextdocument(curDoc)
+	Wend
+	MsgBox "Все документы успешно скопированы!", 32
+	
+labelExit:
+	Exit Sub
+
+errh:
+	MsgBox ("Ошибка № " & CStr(Err) & " в строке " & CStr(Erl) & " - "  & Error$), 16
+	Resume labelExit
+End Sub
+%REM
+	Function getDBFromTurgetDB
+	Description: Comments for Function
+%END REM
+Function getDBFromTurgetDB(key As String, targetDB As NotesDatabase) As NotesDatabase
+	Dim targetConfDoc As NotesDocument
+	Dim tergetView As NotesView
+	Dim confDB As NotesDatabase
+	Dim session As New NotesSession
+	
+	If targetDB Is Nothing Then Error 5005, "Не определена целевая БД!"
+	Set tergetView = targetDB.Getview("(settings.dbreal.by.code)")
+	If tergetView Is Nothing Then Error 5005, "Не удалось открыть представление '(settings.dbreal.by.code)' в целевой БД!"
+	Set targetConfDoc = tergetView.Getdocumentbykey("~0~", True)
+	If targetConfDoc Is Nothing Then Error 5005, "Не найден конфигурационный документ в целевой БД!"
+	Set confDB = session.Getdatabase(targetConfDoc.Server(0), targetConfDoc.File(0), False)
+	If confDB Is Nothing Then Error 5005, "Не удалось открыть СБД Конфигуратор целевой БД!"
+	Set tergetView = confDB.Getview("(settings.dbreal.by.code)")
+	If tergetView Is Nothing Then Error 5005, "Не удалось открыть представление '(settings.dbreal.by.code)' в СБД Конфигуратор целевой БД!"
+	Set targetConfDoc = tergetView.Getdocumentbykey("~" + key +  "~", True)
+	If targetConfDoc Is Nothing Then Error 5005, "Не конфигурационный документ в СБД Конфигуратор целевой БД с ключем '" + key + "'"
+	Set getDBFromTurgetDB = session.Getdatabase(targetConfDoc.Server(0), targetConfDoc.File(0), False)
+	If getDBFromTurgetDB Is Nothing Then Error 5005, "Не удалось открыть искомую БД. Проверьте правильность пути базы!"
+	
+End Function
