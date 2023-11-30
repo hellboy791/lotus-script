@@ -1,0 +1,14 @@
+Function removeSumbolsFromString(ts As string) As String
+	
+	Dim x As Integer 
+	Dim ascx As String
+	
+	removeSumbolsFromString = ""
+	For x=1 To Len(ts)
+		ascx =  Mid$(ts,x,1) 
+		If (Asc(ascx)>= 192) And (Asc(ascx)<=255) or (Asc(ascx)>=97) And (Asc(ascx)<=122) Or (Asc(ascx)>=48) And (Asc(ascx)<=57) Or Asc(ascx)=32 Then
+			removeSumbolsFromString = removeSumbolsFromString + ascx
+		End If
+	Next
+	
+End Function
