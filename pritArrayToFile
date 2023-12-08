@@ -1,0 +1,13 @@
+Sub pritArrayToFile(filePath As String, var As Variant)
+	Dim fileNum As Integer
+	Dim fileName As String
+	
+	fileNum% = FreeFile()
+	fileName = filePath
+	Open fileName For Output As #fileNum%
+	ForAll fields In var 
+		Write #fileNum, fields
+	End ForAll
+	Close fileNum%
+	
+End Sub
