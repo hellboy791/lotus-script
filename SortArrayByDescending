@@ -1,0 +1,16 @@
+Sub SortArrayByDescending(astrNames() As Variant)
+	' Сортировка массива строк по алфавиту (в порядке убывания)
+	Dim i As Long, j As Long
+	Dim strBuffer As String
+	Dim fBuffer As Boolean
+	For i = LBound(astrNames) To UBound(astrNames) - 1
+		For j = i + 1 To UBound(astrNames)
+			If astrNames(i) < astrNames(j) Then
+				' Меняем i-й и j-й элементы массива местами
+				strBuffer = astrNames(i)
+				astrNames(i) = astrNames(j)
+				astrNames(j) = strBuffer
+			End If
+		Next 
+	Next i
+End Sub
